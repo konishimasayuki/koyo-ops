@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { ConfirmProvider } from './components/Confirm.jsx';
 import Layout from './components/Layout.jsx';
 import Docs from './pages/Docs.jsx';
 import Login from './pages/Login.jsx';
@@ -51,11 +52,13 @@ export default function App() {
   if (!user) return <Login onLogin={setUser} />;
 
   return (
-    <Layout user={user} page={page} pages={PAGES} onNavigate={go} onLogout={logout}>
-      {page === 'tasks' && <Tasks me={user} onAuthError={onAuthError} />}
-      {page === 'vehicles' && <Vehicles onAuthError={onAuthError} />}
-      {page === 'docs' && <Docs onAuthError={onAuthError} />}
-      {page === 'settings' && <Settings me={user} onMeChange={setUser} onAuthError={onAuthError} />}
-    </Layout>
+    <ConfirmProvider>
+      <Layout user={user} page={page} pages={PAGES} onNavigate={go} onLogout={logout}>
+        {page === 'tasks' && <Tasks me={user} onAuthError={onAuthError} />}
+        {page === 'vehicles' && <Vehicles onAuthError={onAuthError} />}
+        {page === 'docs' && <Docs onAuthError={onAuthError} />}
+        {page === 'settings' && <Settings me={user} onMeChange={setUser} onAuthError={onAuthError} />}
+      </Layout>
+    </ConfirmProvider>
   );
 }

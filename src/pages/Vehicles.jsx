@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import { useConfirm } from '../components/Confirm.jsx';
 
 const CATEGORIES = ['高級ミニバン', '高級セダン', 'ワゴン', 'ミニバン', 'コンパクト', '軽', '社用車', 'ピックアップ', 'バイク', 'トレーラー', '広告宣伝車', 'その他'];
 const COMPANIES = ['浩洋国際', 'HayateX', 'GTO', '3社共同'];
@@ -237,6 +238,7 @@ export default function Vehicles({ onAuthError }) {
 }
 
 function VehicleModal({ vehicle, onClose, onSave, onDelete }) {
+  const confirm = useConfirm();
   const [f, setF] = useState(vehicle);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -267,7 +269,7 @@ function VehicleModal({ vehicle, onClose, onSave, onDelete }) {
   };
 
   const del = async () => {
-    if (!window.confirm(`「${f.model}（${f.plate || 'ナンバーなし'}）」を削除します。よろしいですか？`)) return;
+    if (!(await confirm(`「${f.model}（${f.plate || 'ナンバーなし'}）」を削除します。よろしいですか？`, { ok: '削除する', danger: true }))) return;
     setBusy(true);
     try {
       await onDelete(f.id);

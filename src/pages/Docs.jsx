@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
+import { useConfirm } from '../components/Confirm.jsx';
+
 import { openPdf, pdfThumb, renderPage } from '../pdf.js';
 
 const COMPANIES = ['浩洋国際', 'HayateX', 'GTO', '3社共同'];
@@ -305,6 +307,7 @@ function UploadModal({ onClose, onDone }) {
 }
 
 function ViewModal({ doc, onClose, onSaved, onDeleted }) {
+  const confirm = useConfirm();
   const [file, setFile] = useState(blobCache.get(doc.id) || null);
   const url = file?.url || '';
   const [progress, setProgress] = useState(0);
@@ -344,7 +347,7 @@ function ViewModal({ doc, onClose, onSaved, onDeleted }) {
   };
 
   const del = async () => {
-    if (!window.confirm(`「${doc.name}」を削除します。よろしいですか？`)) return;
+    if (!(await confirm(`「${doc.name}」を削除します。よろしいですか？`, { ok: '削除する', danger: true }))) return;
     setBusy(true);
     try {
       await api.deleteDoc(doc.id);

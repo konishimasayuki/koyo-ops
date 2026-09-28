@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
+import { useConfirm } from '../components/Confirm.jsx';
 
 const STATUSES = ['未着手', '進行中', '完了'];
 const PRIORITIES = ['高', '中', '低'];
@@ -237,6 +238,7 @@ export default function Tasks({ me, onAuthError }) {
 }
 
 function TaskModal({ task, cfg, onClose, onSave, onDelete, userName }) {
+  const confirm = useConfirm();
   const [f, setF] = useState(task);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -267,7 +269,7 @@ function TaskModal({ task, cfg, onClose, onSave, onDelete, userName }) {
   };
 
   const del = async () => {
-    if (!window.confirm(`「${f.title}」を削除します。よろしいですか？`)) return;
+    if (!(await confirm(`「${f.title}」を削除します。よろしいですか？`, { ok: '削除する', danger: true }))) return;
     setBusy(true);
     try {
       await onDelete(f.id);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { useConfirm } from '../components/Confirm.jsx';
 
 export default function Settings({ me, onMeChange, onAuthError }) {
   const isAdmin = me.role === 'admin';
@@ -132,8 +133,9 @@ function AddUser({ onAdded, onError }) {
 }
 
 function UserList({ users, me, isAdmin, onChanged, onFlash, onError }) {
+  const confirm = useConfirm();
   const del = async (u) => {
-    if (!window.confirm(`${u.name}さん（@${u.username}）を削除します。よろしいですか？`)) return;
+    if (!(await confirm(`${u.name}さん（@${u.username}）を削除します。よろしいですか？`, { ok: '削除する', danger: true }))) return;
     try {
       await api.deleteUser(u.id);
       onFlash(`${u.name}さんを削除しました`);
@@ -388,12 +390,14 @@ function TaskSettings({ onFlash, onError }) {
 }
 
 function ImportTasks({ onDone, onError }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const run = async () => {
     if (
-      !window.confirm(
+      !(await confirm(
         '戦略資料の開業準備タスク（細目つき）を取り込みます。\n・事業を8つ（共通／レンタカー／スパイダー／タクシー／アドトラック／キャンプトレーラー／トレーラー販売／整備工場）に整理します\n・登録済みのタスクは残し、細目を追加します\n・足りないタスクを追加します\nよろしいですか？',
-      )
+        { ok: '取り込む' },
+      ))
     )
       return;
     setBusy(true);
