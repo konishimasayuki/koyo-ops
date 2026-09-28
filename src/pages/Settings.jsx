@@ -7,7 +7,6 @@ export default function Settings({ me, onMeChange, onAuthError }) {
   const [users, setUsers] = useState([]);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
-  const [cfgVer, setCfgVer] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -53,16 +52,7 @@ export default function Settings({ me, onMeChange, onAuthError }) {
         </p>
       )}
 
-      {isAdmin && <TaskSettings key={cfgVer} onFlash={flash} onError={fail} />}
-      {isAdmin && (
-        <ImportTasks
-          onDone={(m) => {
-            flash(m);
-            setCfgVer((v) => v + 1);
-          }}
-          onError={fail}
-        />
-      )}
+      {isAdmin && <TaskSettings onFlash={flash} onError={fail} />}
 
       <div className="cards">
         {isAdmin && (
@@ -385,40 +375,6 @@ function TaskSettings({ onFlash, onError }) {
         </div>
       </div>
       {dirty && <p className="muted small">変更は「変更を保存」を押すまで反映されません。</p>}
-    </div>
-  );
-}
-
-function ImportTasks({ onDone, onError }) {
-  const confirm = useConfirm();
-  const [busy, setBusy] = useState(false);
-  const run = async () => {
-    if (
-      !(await confirm(
-        '戦略資料の開業準備タスク（細目つき）を取り込みます。\n・事業を8つ（共通／レンタカー／スパイダー／タクシー／アドトラック／キャンプトレーラー／トレーラー販売／整備工場）に整理します\n・登録済みのタスクは残し、細目を追加します\n・足りないタスクを追加します\nよろしいですか？',
-        { ok: '取り込む' },
-      ))
-    )
-      return;
-    setBusy(true);
-    try {
-      const r = await api.importTasks();
-      onDone(`タスクを${r.created}件追加し、${r.updated}件を更新しました`);
-    } catch (e) {
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="card import-card">
-      <div>
-        <h2>資料のタスクを取り込む</h2>
-        <p className="muted small">戦略資料の開業準備タスクを、細目（チェック項目）つきで取り込みます。登録済みのタスクや完了状況は消えません。何度押しても重複しません。</p>
-      </div>
-      <button type="button" className="btn ghost" onClick={run} disabled={busy}>
-        {busy ? '取り込み中…' : '取り込む'}
-      </button>
     </div>
   );
 }
