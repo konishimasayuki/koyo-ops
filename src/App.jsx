@@ -52,7 +52,7 @@ export default function App() {
   return (
     <Layout user={user} page={page} pages={PAGES} onNavigate={go} onLogout={logout}>
       {page === 'tasks' && <Tasks me={user} onAuthError={onAuthError} />}
-      {page === 'vehicles' && <Vehicles me={user} onAuthError={onAuthError} />}
+      {page === 'vehicles' && <Vehicles onAuthError={onAuthError} />}
       {page === 'settings' && <Settings me={user} onMeChange={setUser} onAuthError={onAuthError} />}
     </Layout>
   );

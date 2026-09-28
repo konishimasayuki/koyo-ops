@@ -11,15 +11,16 @@
 api/_lib.js        共通処理（Redis接続・ログイン・パスワード暗号化・初期ユーザー作成）
 api/auth.js        ログイン・ログアウト・ログイン中ユーザー
 api/users.js       ユーザーの一覧・追加・変更・削除
-api/tasks.js       業務タスクの一覧・登録・編集・完了・削除、初期タスクの取り込み
-api/vehicles.js    車両の一覧・登録・編集・削除、保有車両の取り込み
+api/config.js      タスク設定（事業・担当者の一覧）
+api/tasks.js       業務タスクの一覧・登録・編集・完了・削除
+api/vehicles.js    車両の一覧・登録・編集・削除
 src/App.jsx        ログイン判定と画面切替
 src/api.js         APIの呼び出し
 src/components/Layout.jsx  メニュー（PCは左、スマホはハンバーガー）とロゴ
 src/pages/Login.jsx        ログイン画面
 src/pages/Tasks.jsx        業務タスク
 src/pages/Vehicles.jsx     車両一覧
-src/pages/Settings.jsx     設定（ユーザー追加・アカウント・初期データの取り込み）
+src/pages/Settings.jsx     設定（タスク設定・ユーザー追加・アカウント）
 src/styles.css     スタイル
 ```
 
@@ -40,6 +41,7 @@ src/styles.css     スタイル
 | `koyo:user:{id}` | ユーザー（パスワードはscryptで暗号化） |
 | `koyo:username:{ログインID}` | ログインID → ユーザーID |
 | `koyo:session:{token}` | ログイン状態（14日で自動削除） |
+| `koyo:config:tasks` | タスク設定（事業・担当者） |
 | `koyo:tasks` | タスクIDの一覧（Set） |
 | `koyo:task:{id}` | タスク |
 | `koyo:vehicles` | 車両IDの一覧（Set） |

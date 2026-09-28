@@ -37,7 +37,7 @@ export default function Settings({ me, onMeChange, onAuthError }) {
       <div className="page-head">
         <div>
           <h1>設定</h1>
-          <p className="muted">ユーザーの追加と、アカウントの管理を行います。</p>
+          <p className="muted">タスクの事業・担当者と、ユーザーの管理を行います。</p>
         </div>
       </div>
       {msg && (
@@ -51,6 +51,8 @@ export default function Settings({ me, onMeChange, onAuthError }) {
         </p>
       )}
 
+      {isAdmin && <TaskSettings onFlash={flash} onError={fail} />}
+
       <div className="cards">
         {isAdmin && (
           <AddUser
@@ -63,8 +65,6 @@ export default function Settings({ me, onMeChange, onAuthError }) {
         )}
         <UserList users={users} me={me} isAdmin={isAdmin} onChanged={load} onFlash={flash} onError={fail} />
         <MyAccount me={me} onMeChange={onMeChange} onFlash={flash} onError={fail} />
-        {isAdmin && <SeedTasks onFlash={flash} onError={fail} />}
-        {isAdmin && <SeedVehicles onFlash={flash} onError={fail} />}
       </div>
     </section>
   );
@@ -111,7 +111,7 @@ function AddUser({ onAdded, onError }) {
           </select>
         </label>
       </div>
-      <p className="muted small">ログインIDは半角英数字です。管理者は、ユーザーの追加・削除と初期タスクの取り込みができます。</p>
+      <p className="muted small">ログインIDは半角英数字です。管理者は、ユーザーの追加・削除とタスク設定の変更ができます。</p>
       <div className="card-foot">
         <button type="submit" className="btn gold" disabled={busy}>
           {busy ? '追加中…' : '追加する'}
@@ -230,56 +230,149 @@ function MyAccount({ me, onMeChange, onFlash, onError }) {
   );
 }
 
-function SeedTasks({ onFlash, onError }) {
-  const [busy, setBusy] = useState(false);
-  const run = async () => {
-    if (!window.confirm('戦略資料の開業準備タスク（28件）を登録します。よろしいですか？')) return;
-    setBusy(true);
-    try {
-      const r = await api.seedTasks();
-      onFlash(`初期タスクを${r.count}件登録しました。業務タスクで確認できます`);
-    } catch (e) {
-      onError(e);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="card">
-      <h2>初期タスクの取り込み</h2>
-      <p className="muted">戦略資料のPART 2「開業準備タスク」を、事業ごとにまとめて登録します。取り込みは1回だけです。</p>
-      <div className="card-foot">
-        <button type="button" className="btn ghost" onClick={run} disabled={busy}>
-          {busy ? '登録中…' : '開業準備タスクを取り込む'}
-        </button>
-      </div>
-    </div>
-  );
-}
+const COMPANIES = ['浩洋国際', 'HayateX', 'GTO', '3社共同'];
+const tmpId = () => `new-${Math.random().toString(36).slice(2, 9)}`;
 
-function SeedVehicles({ onFlash, onError }) {
+function TaskSettings({ onFlash, onError }) {
+  const [cats, setCats] = useState([]);
+  const [people, setPeople] = useState([]);
+  const [newCat, setNewCat] = useState('');
+  const [newPerson, setNewPerson] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
-  const run = async () => {
-    if (!window.confirm('戦略資料の保有車両（38台）を登録します。よろしいですか？')) return;
+
+  useEffect(() => {
+    api
+      .taskConfig()
+      .then((r) => {
+        setCats(r.config.categories);
+        setPeople(r.config.assignees);
+      })
+      .catch(onError);
+  }, [onError]);
+
+  const touch =
+    (fn) =>
+    (...a) => {
+      fn(...a);
+      setDirty(true);
+    };
+  const editCat = touch((id, k, v) => setCats((l) => l.map((c) => (c.id === id ? { ...c, [k]: v } : c))));
+  const moveCat = touch((i, d) =>
+    setCats((l) => {
+      const n = [...l];
+      const j = i + d;
+      if (j < 0 || j >= n.length) return l;
+      [n[i], n[j]] = [n[j], n[i]];
+      return n;
+    }),
+  );
+  const delCat = touch((id) => setCats((l) => l.filter((c) => c.id !== id)));
+  const addCat = touch(() => {
+    const name = newCat.trim();
+    if (!name) return;
+    setCats((l) => [...l, { id: tmpId(), name, company: '3社共同' }]);
+    setNewCat('');
+  });
+  const editPerson = touch((id, v) => setPeople((l) => l.map((p) => (p.id === id ? { ...p, name: v } : p))));
+  const delPerson = touch((id) => setPeople((l) => l.filter((p) => p.id !== id)));
+  const addPerson = touch(() => {
+    const name = newPerson.trim();
+    if (!name) return;
+    setPeople((l) => [...l, { id: tmpId(), name }]);
+    setNewPerson('');
+  });
+
+  const save = async () => {
     setBusy(true);
     try {
-      const r = await api.seedVehicles();
-      onFlash(`保有車両を${r.count}台登録しました。車両一覧で確認できます`);
+      const strip = (x) => ({ ...x, id: String(x.id).startsWith('new-') ? '' : x.id });
+      const r = await api.saveTaskConfig({ categories: cats.map(strip), assignees: people.map(strip) });
+      setCats(r.config.categories);
+      setPeople(r.config.assignees);
+      setDirty(false);
+      onFlash('タスク設定を保存しました');
     } catch (e) {
       onError(e);
     } finally {
       setBusy(false);
     }
   };
+
+  const onEnter = (fn) => (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      fn();
+    }
+  };
+
   return (
-    <div className="card">
-      <h2>保有車両の取り込み</h2>
-      <p className="muted">戦略資料の車両一覧（37台＋アドトラック）を登録します。複数台の車種は1台ずつに分けて登録します。取り込みは1回だけです。</p>
-      <div className="card-foot">
-        <button type="button" className="btn ghost" onClick={run} disabled={busy}>
-          {busy ? '登録中…' : '保有車両を取り込む'}
+    <div className="card task-settings">
+      <div className="ts-head">
+        <h2>タスク設定</h2>
+        <button type="button" className="btn gold" onClick={save} disabled={busy || !dirty}>
+          {busy ? '保存中…' : dirty ? '変更を保存' : '保存済み'}
         </button>
       </div>
+      <div className="ts-cols">
+        <div>
+          <h3>事業</h3>
+          <p className="muted small">業務タスクは、この並び順で事業ごとに表示されます。会社の色が付きます。</p>
+          <ul className="ts-list">
+            {cats.map((c, i) => (
+              <li key={c.id}>
+                <input value={c.name} onChange={(e) => editCat(c.id, 'name', e.target.value)} aria-label="事業名" />
+                <select value={c.company} onChange={(e) => editCat(c.id, 'company', e.target.value)} aria-label="会社">
+                  {COMPANIES.map((co) => (
+                    <option key={co}>{co}</option>
+                  ))}
+                </select>
+                <div className="ts-btns">
+                  <button type="button" className="icon" onClick={() => moveCat(i, -1)} disabled={i === 0} aria-label="上へ">
+                    ↑
+                  </button>
+                  <button type="button" className="icon" onClick={() => moveCat(i, 1)} disabled={i === cats.length - 1} aria-label="下へ">
+                    ↓
+                  </button>
+                  <button type="button" className="icon del" onClick={() => delCat(c.id)} aria-label="削除">
+                    ×
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="ts-add">
+            <input value={newCat} onChange={(e) => setNewCat(e.target.value)} onKeyDown={onEnter(addCat)} placeholder="事業を追加（例：建設）" />
+            <button type="button" className="btn ghost" onClick={addCat}>
+              追加
+            </button>
+          </div>
+        </div>
+        <div>
+          <h3>担当者</h3>
+          <p className="muted small">タスクの担当者欄に出る名前です。ログインしない人も登録できます。</p>
+          <ul className="ts-list">
+            {people.map((p) => (
+              <li key={p.id} className="one">
+                <input value={p.name} onChange={(e) => editPerson(p.id, e.target.value)} aria-label="担当者名" />
+                <div className="ts-btns">
+                  <button type="button" className="icon del" onClick={() => delPerson(p.id)} aria-label="削除">
+                    ×
+                  </button>
+                </div>
+              </li>
+            ))}
+            {people.length === 0 && <li className="muted small">まだ登録されていません</li>}
+          </ul>
+          <div className="ts-add">
+            <input value={newPerson} onChange={(e) => setNewPerson(e.target.value)} onKeyDown={onEnter(addPerson)} placeholder="担当者を追加（例：清水）" />
+            <button type="button" className="btn ghost" onClick={addPerson}>
+              追加
+            </button>
+          </div>
+        </div>
+      </div>
+      {dirty && <p className="muted small">変更は「変更を保存」を押すまで反映されません。</p>}
     </div>
   );
 }

@@ -136,3 +136,33 @@ export function withAuth(handler, { admin = false } = {}) {
     }
   };
 }
+
+// ---------- タスク設定（事業・担当者） ----------
+export const COMPANIES = ['浩洋国際', 'HayateX', 'GTO', '3社共同'];
+const DEFAULT_CATEGORIES = [
+  ['共通', '3社共同'],
+  ['レンタカー', '浩洋国際'],
+  ['スパイダー', '浩洋国際'],
+  ['タクシー', 'HayateX'],
+  ['アドトラック', 'GTO'],
+  ['キャンプトレーラー', '3社共同'],
+  ['整備', '3社共同'],
+  ['トレーラー販売', '3社共同'],
+  ['HP・システム', '3社共同'],
+];
+export const configKey = () => key('config', 'tasks');
+
+// タスク設定を読む（初回は既定の事業と、登録済みユーザーを担当者として作る）
+export async function loadTaskConfig() {
+  const r = redis();
+  const cur = await r.get(configKey());
+  if (cur) return cur;
+  const ids = await r.smembers(key('users'));
+  const users = await getMany(ids, 'user');
+  const cfg = {
+    categories: DEFAULT_CATEGORIES.map(([name, company]) => ({ id: newId(), name, company })),
+    assignees: users.map((u) => ({ id: u.id, name: u.name })),
+  };
+  await r.set(configKey(), cfg);
+  return cfg;
+}

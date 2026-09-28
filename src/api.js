@@ -31,10 +31,10 @@ export const api = {
   addTask: (t) => request('/api/tasks', { method: 'POST', data: t }),
   updateTask: (t) => request('/api/tasks', { method: 'PUT', data: t }),
   deleteTask: (id) => request(`/api/tasks?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  seedTasks: () => request('/api/tasks?action=seed', { method: 'POST' }),
+  taskConfig: () => request('/api/config'),
+  saveTaskConfig: (c) => request('/api/config', { method: 'PUT', data: c }),
   vehicles: () => request('/api/vehicles'),
   addVehicle: (v) => request('/api/vehicles', { method: 'POST', data: v }),
   updateVehicle: (v) => request('/api/vehicles', { method: 'PUT', data: v }),
   deleteVehicle: (id) => request(`/api/vehicles?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
-  seedVehicles: () => request('/api/vehicles?action=seed', { method: 'POST' }),
 };

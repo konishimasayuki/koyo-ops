@@ -37,7 +37,7 @@ const shakenState = (v, today, soon) => {
 };
 const isMissing = (v) => !v.year || !v.inspectionDate || v.mileage === '' || v.mileage === undefined;
 
-export default function Vehicles({ me, onAuthError }) {
+export default function Vehicles({ onAuthError }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -172,51 +172,62 @@ export default function Vehicles({ me, onAuthError }) {
       ) : shown.length === 0 ? (
         <div className="empty">
           <p>表示する車両はありません。</p>
-          {list.length === 0 && me.role === 'admin' && <p className="muted">設定タブの「保有車両の取り込み」で、戦略資料の車両一覧をまとめて登録できます。</p>}
         </div>
       ) : (
-        <div className="vtable">
-          <div className="vrow vhead" aria-hidden="true">
-            <span>車種・ナンバー</span>
-            <span>区分</span>
-            <span>会社・用途</span>
-            <span>状態</span>
-            <span>車検期限</span>
-            <span>年式・走行距離</span>
-          </div>
-          {shown.map((v) => {
-            const sk = shakenState(v, today, soon);
-            return (
-              <button type="button" key={v.id} className={`vrow${sk ? ` sk-${sk}` : ''}`} onClick={() => setEditing(v)}>
-                <span className="v-main">
-                  <b>{v.model}</b>
-                  <span className={`plate${v.use === 'タクシー' ? ' green' : ''}${v.plate ? '' : ' none'}`}>{v.plate || 'ナンバーなし'}</span>
-                  {v.note && <small className="v-note">{v.note}</small>}
-                </span>
-                <span className="v-cat">
-                  {v.category}
-                  {v.color ? `・${v.color}` : ''}
-                </span>
-                <span className="v-co">
-                  <span className={`tag ${COMPANY_CLASS[v.company] || 'c-all'}`}>{v.company}</span>
-                  <span className="v-use">{v.use}</span>
-                </span>
-                <span>
-                  <span className={`vst vst-${v.status}`}>{v.status}</span>
-                </span>
-                <span className={`v-shaken${sk ? ` ${sk}` : ''}`}>
-                  <em className="lbl">車検 </em>
-                  {v.inspectionDate ? fmtDate(v.inspectionDate) : '未入力'}
-                  {sk === 'expired' && '（期限切れ）'}
-                  {sk === 'soon' && '（30日以内）'}
-                </span>
-                <span className="v-spec">
-                  {v.year ? `${v.year}年式` : '年式 未入力'}
-                  {v.mileage !== '' && v.mileage !== undefined ? `・${fmtNum(v.mileage)}km` : ''}
-                </span>
-              </button>
-            );
-          })}
+        <div className="vscroll">
+          <table className="vt">
+            <thead>
+              <tr>
+                <th className="stick">車種</th>
+                <th>ナンバー</th>
+                <th>区分</th>
+                <th>色</th>
+                <th>所属会社</th>
+                <th>用途</th>
+                <th>状態</th>
+                <th>年式</th>
+                <th>車検期限</th>
+                <th className="num">走行距離</th>
+                <th className="num">購入価格</th>
+                <th>メモ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((v) => {
+                const sk = shakenState(v, today, soon);
+                return (
+                  <tr key={v.id} className={sk ? `sk-${sk}` : ''} onClick={() => setEditing(v)}>
+                    <td className="stick">
+                      <button type="button" className="vt-link" onClick={() => setEditing(v)}>
+                        {v.model}
+                      </button>
+                    </td>
+                    <td>
+                      <span className={`plate${v.use === 'タクシー' ? ' green' : ''}${v.plate ? '' : ' none'}`}>{v.plate || 'ナンバーなし'}</span>
+                    </td>
+                    <td>{v.category}</td>
+                    <td>{v.color}</td>
+                    <td>
+                      <span className={`tag ${COMPANY_CLASS[v.company] || 'c-all'}`}>{v.company}</span>
+                    </td>
+                    <td>{v.use}</td>
+                    <td>
+                      <span className={`vst vst-${v.status}`}>{v.status}</span>
+                    </td>
+                    <td>{v.year ? `${v.year}年` : <span className="nil">未入力</span>}</td>
+                    <td className={sk ? `v-shaken ${sk}` : ''}>
+                      {v.inspectionDate ? fmtDate(v.inspectionDate) : <span className="nil">未入力</span>}
+                      {sk === 'expired' && <small>期限切れ</small>}
+                      {sk === 'soon' && <small>30日以内</small>}
+                    </td>
+                    <td className="num">{v.mileage !== '' && v.mileage !== undefined ? `${fmtNum(v.mileage)} km` : <span className="nil">未入力</span>}</td>
+                    <td className="num">{v.purchasePrice !== '' && v.purchasePrice !== undefined ? `${fmtNum(v.purchasePrice)} 円` : <span className="nil">未入力</span>}</td>
+                    <td className="memo">{v.note}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
