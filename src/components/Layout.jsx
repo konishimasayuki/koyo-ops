@@ -58,6 +58,13 @@ const ICONS = {
       <path d="M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2" />
     </svg>
   ),
+  calendar: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <path d="M8 14h2M12 14h2M16 14h.5M8 17.5h2M12 17.5h2" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3.2" />
