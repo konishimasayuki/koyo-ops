@@ -77,6 +77,8 @@ export default function Tasks({ me, onAuthError }) {
       });
   }, [tasks, cfg, cat, who, view, t0, companyOf]);
 
+  const openCount = useCallback((name) => tasks.filter((t) => t.status !== '完了' && (!name || t.category === name)).length, [tasks]);
+
   const toggleDone = async (t) => {
     const next = { ...t, status: t.status === '完了' ? '進行中' : '完了' };
     setTasks((all) => all.map((x) => (x.id === t.id ? next : x)));
@@ -114,6 +116,19 @@ export default function Tasks({ me, onAuthError }) {
         </button>
       </div>
 
+      <div className="chips" role="group" aria-label="事業で絞り込む">
+        <button type="button" className={`chip${cat === '' ? ' on' : ''}`} onClick={() => setCat('')}>
+          すべて<b>{openCount('')}</b>
+        </button>
+        {cfg.categories.map((c) => (
+          <button key={c.id} type="button" className={`chip${cat === c.name ? ' on' : ''}`} onClick={() => setCat(c.name)}>
+            <i className={`dot ${COMPANY_CLASS[c.company] || 'c-all'}`} />
+            {c.name}
+            <b className={openCount(c.name) ? '' : 'zero'}>{openCount(c.name)}</b>
+          </button>
+        ))}
+      </div>
+
       <div className="task-tools">
         <div className="seg compact" role="group" aria-label="表示するタスク">
           {VIEWS.map(([k, label]) => (
@@ -122,14 +137,6 @@ export default function Tasks({ me, onAuthError }) {
             </button>
           ))}
         </div>
-        <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="事業で絞り込む">
-          <option value="">すべての事業</option>
-          {cfg.categories.map((c) => (
-            <option key={c.id} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
         <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="担当者で絞り込む">
           <option value="">すべての担当者</option>
           <option value="none">担当者なし</option>
@@ -182,6 +189,14 @@ export default function Tasks({ me, onAuthError }) {
                             <button type="button" className="task-body" onClick={() => setEditing(t)}>
                               <span className="task-title">{t.title}</span>
                               {t.detail && <span className="task-detail">{t.detail}</span>}
+                              {t.checklist?.length > 0 && (
+                                <span className="cl-prog">
+                                  <span className="cl-bar">
+                                    <i style={{ width: `${(t.checklist.filter((c) => c.done).length / t.checklist.length) * 100}%` }} />
+                                  </span>
+                                  細目 {t.checklist.filter((c) => c.done).length}/{t.checklist.length}
+                                </span>
+                              )}
                               <span className="task-meta">
                                 <span className={`pri p-${t.priority}`}>{t.priority}</span>
                                 {t.status !== '完了' && <span className={`st st-${t.status}`}>{t.status}</span>}
@@ -279,8 +294,9 @@ function TaskModal({ task, cfg, onClose, onSave, onDelete, userName }) {
         </label>
         <label>
           内容・メモ
-          <textarea rows={4} value={f.detail} onChange={set('detail')} />
+          <textarea rows={3} value={f.detail} onChange={set('detail')} />
         </label>
+        <Checklist items={f.checklist || []} onChange={(checklist) => setF((x) => ({ ...x, checklist }))} />
         <div className="grid2">
           <label>
             事業
@@ -355,6 +371,67 @@ function TaskModal({ task, cfg, onClose, onSave, onDelete, userName }) {
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+const tmpId = () => `c-${Math.random().toString(36).slice(2, 9)}`;
+
+function Checklist({ items, onChange }) {
+  const [text, setText] = useState('');
+  const done = items.filter((c) => c.done).length;
+  const add = () => {
+    const v = text.trim();
+    if (!v) return;
+    onChange([...items, { id: tmpId(), text: v, done: false }]);
+    setText('');
+  };
+  return (
+    <div className="cl">
+      <div className="cl-head">
+        <span>細目</span>
+        {items.length > 0 && (
+          <span className="muted small">
+            {done}/{items.length} 完了
+          </span>
+        )}
+      </div>
+      <ul>
+        {items.map((c) => (
+          <li key={c.id} className={c.done ? 'done' : ''}>
+            <button
+              type="button"
+              className="cl-check"
+              aria-label={c.done ? '未完了に戻す' : '完了にする'}
+              onClick={() => onChange(items.map((x) => (x.id === c.id ? { ...x, done: !x.done } : x)))}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 12.5l4 4 8-9" />
+              </svg>
+            </button>
+            <input value={c.text} onChange={(e) => onChange(items.map((x) => (x.id === c.id ? { ...x, text: e.target.value } : x)))} aria-label="細目" />
+            <button type="button" className="cl-del" aria-label="細目を削除" onClick={() => onChange(items.filter((x) => x.id !== c.id))}>
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="cl-add">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder="細目を追加"
+        />
+        <button type="button" className="btn ghost sm" onClick={add}>
+          追加
+        </button>
+      </div>
     </div>
   );
 }

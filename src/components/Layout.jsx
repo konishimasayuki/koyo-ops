@@ -40,6 +40,12 @@ const ICONS = {
       <circle cx="17" cy="16.5" r="1.8" />
     </svg>
   ),
+  docs: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v4h4M9 12h6M9 16h6" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3.2" />
