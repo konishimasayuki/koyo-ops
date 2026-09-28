@@ -32,6 +32,14 @@ const ICONS = {
       <path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17" />
     </svg>
   ),
+  vehicles: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 16v-4l2-5h14l2 5v4z" />
+      <path d="M3 12h18" />
+      <circle cx="7" cy="16.5" r="1.8" />
+      <circle cx="17" cy="16.5" r="1.8" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3.2" />

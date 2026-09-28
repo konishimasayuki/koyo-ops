@@ -64,6 +64,7 @@ export default function Settings({ me, onMeChange, onAuthError }) {
         <UserList users={users} me={me} isAdmin={isAdmin} onChanged={load} onFlash={flash} onError={fail} />
         <MyAccount me={me} onMeChange={onMeChange} onFlash={flash} onError={fail} />
         {isAdmin && <SeedTasks onFlash={flash} onError={fail} />}
+        {isAdmin && <SeedVehicles onFlash={flash} onError={fail} />}
       </div>
     </section>
   );
@@ -250,6 +251,33 @@ function SeedTasks({ onFlash, onError }) {
       <div className="card-foot">
         <button type="button" className="btn ghost" onClick={run} disabled={busy}>
           {busy ? '登録中…' : '開業準備タスクを取り込む'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SeedVehicles({ onFlash, onError }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (!window.confirm('戦略資料の保有車両（38台）を登録します。よろしいですか？')) return;
+    setBusy(true);
+    try {
+      const r = await api.seedVehicles();
+      onFlash(`保有車両を${r.count}台登録しました。車両一覧で確認できます`);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="card">
+      <h2>保有車両の取り込み</h2>
+      <p className="muted">戦略資料の車両一覧（37台＋アドトラック）を登録します。複数台の車種は1台ずつに分けて登録します。取り込みは1回だけです。</p>
+      <div className="card-foot">
+        <button type="button" className="btn ghost" onClick={run} disabled={busy}>
+          {busy ? '登録中…' : '保有車両を取り込む'}
         </button>
       </div>
     </div>
