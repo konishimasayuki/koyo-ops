@@ -32,6 +32,8 @@ export const api = {
   updateTask: (t) => request('/api/tasks', { method: 'PUT', data: t }),
   deleteTask: (id) => request(`/api/tasks?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   taskConfig: () => request('/api/config'),
+  companies: () => request('/api/companies'),
+  updateCompany: (c) => request('/api/companies', { method: 'PUT', data: c }),
   docs: () => request('/api/docs'),
   docChunk: (id, i) => request(`/api/docs?id=${encodeURIComponent(id)}&chunk=${i}`),
   addDoc: (d) => request('/api/docs', { method: 'POST', data: d }),

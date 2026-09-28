@@ -52,6 +52,12 @@ const ICONS = {
       <path d="M14 3v4h4M9 12h6M9 16h6" />
     </svg>
   ),
+  companies: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 21V5l8-2v18M12 8h8v13M4 21h16" />
+      <path d="M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2" />
+    </svg>
+  ),
   settings: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="3.2" />

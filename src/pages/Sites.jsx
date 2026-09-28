@@ -54,18 +54,20 @@ export default function Sites() {
             <h2 className="site-co">
               <span className={`group-bar ${COMPANY_CLASS[g.company]}`} aria-hidden="true" />
               {COMPANY_FULL[g.company]}
-              <small>{g.items.length}サイト</small>
+              <small>
+                連携済み {g.items.filter((s) => status[s.slug] === 'live').length} / {g.items.length}
+              </small>
             </h2>
             <ul className="site-list">
               {g.items.map((s) => {
                 const st = status[s.slug];
                 return (
-                  <li key={s.slug} className="site">
+                  <li key={s.slug} className={`site${st === 'live' ? ' linked' : ''}`}>
                     <div className="site-main">
                       <b>{s.name}</b>
                       <span className="muted small">{s.note}</span>
                     </div>
-                    <span className={`site-st st-${st || 'wait'}`}>{st === 'live' ? '公開中' : st === 'draft' ? '準備中' : st === 'none' ? '未設置' : '確認中'}</span>
+                    <span className={`site-st st-${st || 'wait'}`}>{st === 'live' ? '✓ 連携済み' : st === 'draft' ? '未連携（準備中）' : st === 'none' ? '未設置' : '確認中'}</span>
                     <div className="site-actions">
                       <button type="button" className="btn ghost sm" onClick={() => copy(s.slug)}>
                         {copied === s.slug ? 'コピーしました' : 'リンクをコピー'}

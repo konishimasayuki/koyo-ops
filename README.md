@@ -14,6 +14,7 @@ api/users.js       ユーザーの一覧・追加・変更・削除
 api/config.js      タスク設定（事業・担当者の一覧）
 api/tasks.js       業務タスクの一覧・登録・編集・完了・削除
 api/vehicles.js    車両の一覧・登録・編集・削除
+api/companies.js   会社情報（3社）
 api/docs.js        各種資料（写真・PDF）の登録・分割保存・取得・削除
 src/App.jsx        ログイン判定と画面切替
 src/api.js         APIの呼び出し
@@ -24,6 +25,7 @@ src/pages/Vehicles.jsx     車両一覧
 src/pages/Sites.jsx        HP閲覧（各社のHPへのリンク）
 src/sites.js               HP閲覧に出すサイトの一覧
 src/pages/Docs.jsx         各種資料（プレビュー付き）
+src/pages/Companies.jsx    会社情報（3社の会社名・住所・代表者・法人番号など）
 public/hp/{slug}/index.html  各HPのHTML（準備中のページには <meta name="koyo-hp" content="draft">）
 public/manifest.webmanifest・public/sw.js・public/icons  PWA（ホーム画面に追加して使える）
 src/pages/Settings.jsx     設定（タスク設定・ユーザー追加・アカウント）
@@ -52,6 +54,7 @@ src/styles.css     スタイル
 | `koyo:task:{id}` | タスク |
 | `koyo:vehicles` | 車両IDの一覧（Set） |
 | `koyo:vehicle:{id}` | 車両 |
+| `koyo:companies` | 会社情報（3社） |
 | `koyo:docs` | 資料IDの一覧（Set） |
 | `koyo:doc:{id}` | 資料の情報（会社名・名称・ファイル名・サムネイル） |
 | `koyo:docchunk:{id}:{n}` | ファイル本体（base64を約700KBずつ分割） |
