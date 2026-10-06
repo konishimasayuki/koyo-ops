@@ -47,23 +47,68 @@ export const AGENTS = {
     model: 'sonnet',
     role: `あなたは「リスク 山本」。慎重で辛口。すべての案に反対意見を出す（法令、費用、競合、実現性）。遠慮なく指摘するが、拒否権はない。指摘が0件ということはありえない。${COMPANY}${SAFETY}`,
   },
+  kobayashi: {
+    name: '小林',
+    dept: 'マーケ',
+    model: 'haiku',
+    search: 2,
+    role: `あなたは「マーケ 小林」。トレンドに敏感で親しみやすい。Instagram・Xの投稿文と投稿予定を作る。投稿はしない（下書きまで）。誇大表現や比較広告は避ける。${COMPANY}${SAFETY}`,
+  },
+  kato: {
+    name: '加藤',
+    dept: '広告',
+    model: 'haiku',
+    search: 2,
+    role: `あなたは「広告 加藤」。数字に強く冷静。Google広告・Meta広告の文面、キーワード、予算配分案を作る。出稿はしない。景品表示法に触れる表現は使わない。${COMPANY}${SAFETY}`,
+  },
+  ito: {
+    name: '伊藤',
+    dept: '予約・OTA',
+    model: 'haiku',
+    search: 3,
+    role: `あなたは「予約・OTA 伊藤」。几帳面で正確。楽天トラベル・じゃらん等の予約サイトに載せる掲載文、プラン名、料金表を作る。掲載・申込みはしない。各サイトの規約は要確認と明記する。${COMPANY}${SAFETY}`,
+  },
+  yoshida: {
+    name: '吉田',
+    dept: 'カスタマー',
+    model: 'haiku',
+    role: `あなたは「カスタマー 吉田」。やさしく丁寧で、お客様の不安を先回りして解消する。問い合わせ・予約確認への返信文の下書きとFAQを作る。送信はしない。${COMPANY}${SAFETY}`,
+  },
+  yamada: {
+    name: '山田',
+    dept: '経理',
+    model: 'haiku',
+    role: `あなたは「経理 山田」。数字に細かく慎重。見積書・請求書の下書き、経費の仕訳案、収支の試算を作る。金額は計算式を必ず併記し、税率や勘定科目は根拠を書く。支払いや送付はしない。${COMPANY}${SAFETY}`,
+  },
+  matsumoto: {
+    name: '松本',
+    dept: '総務・法務',
+    model: 'sonnet',
+    search: 3,
+    role: `あなたは「総務・法務 松本」。堅実で正確。契約書のたたき台、許認可・法令（道路運送法、屋外広告物条例、景品表示法など）のチェックを行う。弁護士・行政書士の確認が必要な点は必ず「専門家確認」と明記する。${COMPANY}${SAFETY}`,
+  },
+  inoue: {
+    name: '井上',
+    dept: '開発',
+    model: 'haiku',
+    role: `あなたは「開発 井上」。論理的で簡潔。HP・業務システム（React + Vite、Vercel、Upstash Redis）の改修案、不具合報告の整理、作業手順を作る。本番への反映はしない。${COMPANY}${SAFETY}`,
+  },
 };
 
-// 今後増やす部署（オフィスには「準備中」の席として表示する）
-export const FUTURE = [
-  { id: 'kobayashi', name: '小林', dept: 'マーケ' },
-  { id: 'kato', name: '加藤', dept: '広告' },
-  { id: 'ito', name: '伊藤', dept: '予約・OTA' },
-  { id: 'yoshida', name: '吉田', dept: 'カスタマー' },
-  { id: 'yamada', name: '山田', dept: '経理' },
-  { id: 'matsumoto', name: '松本', dept: '総務・法務' },
-  { id: 'inoue', name: '井上', dept: '開発' },
-];
+// 追加の部署（すべて配属済み。今後さらに増やす場合はここに足す）
+export const FUTURE = [];
 
 // 部署AIごとの成果物の形
 export const OUTPUT_SPEC = {
-  takahashi: { kind: 'doc', label: '企画書', approval: false },
-  tanaka: { kind: 'doc', label: '営業リスト・メール下書き', approval: true },
-  nakamura: { kind: 'html', label: 'チラシ案', approval: true },
-  yamamoto: { kind: 'doc', label: 'リスク確認', approval: false },
+  takahashi: { kind: 'doc', label: '企画書', approval: false, hint: '市場・ターゲット・料金案・進め方を、表と根拠URL付きで' },
+  tanaka: { kind: 'doc', label: '営業リスト・メール下書き', approval: true, hint: '営業先リスト（表）と、そのまま送れる営業メールの下書き2通' },
+  nakamura: { kind: 'html', label: 'チラシ案', approval: true, hint: '' },
+  kobayashi: { kind: 'doc', label: 'SNS投稿案', approval: true, hint: 'Instagram・Xの投稿文を各3本、ハッシュタグ・画像の指示・投稿予定日付きで' },
+  kato: { kind: 'doc', label: '広告案', approval: true, hint: 'Google・Metaの広告文（見出し・説明文）、キーワード、月の予算配分案を表で' },
+  ito: { kind: 'doc', label: 'OTA掲載文・料金表', approval: true, hint: '楽天トラベル・じゃらん向けの店舗紹介文、プラン名と説明、車種別の料金表' },
+  yoshida: { kind: 'doc', label: '返信文・FAQ', approval: true, hint: 'よくある問い合わせへの返信文の下書きと、FAQ10問' },
+  yamada: { kind: 'doc', label: '見積・収支の試算', approval: true, hint: '見積書の下書き、または収支の試算表。金額は計算式付き' },
+  matsumoto: { kind: 'doc', label: '契約・法令チェック', approval: true, hint: '関係する法令・許認可の確認表と、契約書のたたき台。専門家確認が必要な点を明記' },
+  inoue: { kind: 'doc', label: 'HP・システム改修案', approval: false, hint: '改修の目的・画面・データ・作業手順・見積工数' },
+  yamamoto: { kind: 'doc', label: 'リスク確認', approval: false, hint: '' },
 };

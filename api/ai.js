@@ -124,17 +124,28 @@ async function secretary(r, me, text) {
     "title": "案件名（20字以内）",
     "goal": "この案件のゴール（2〜3文）",
     "company": "浩洋国際" | "HayateX" | "GTO" | "3社共同",
-    "tasks": [ { "agent": "takahashi" | "tanaka" | "nakamura", "title": "タスク名", "brief": "担当への具体的な指示（3〜6文）" } ]
+    "tasks": [ { "agent": "担当のID", "title": "タスク名", "brief": "担当への具体的な指示（3〜6文）" } ]
   }
 }
-ルール：仕事の依頼なら case を作る（質問や雑談なら null）。tasks は企画→営業→デザインの順で、それぞれ最大1つ。担当が不要なら入れない。リスク確認のタスクはシステムが自動で足すので入れない。`;
+担当のID（必要な人だけ選ぶ）：
+- takahashi＝企画 高橋（市場調査・事業案・料金案）
+- tanaka＝営業 田中（営業先リスト・営業メール）
+- nakamura＝デザイン 中村（チラシ・バナー・LP）
+- kobayashi＝マーケ 小林（Instagram・Xの投稿）
+- kato＝広告 加藤（Google・Meta広告の文面と予算）
+- ito＝予約・OTA 伊藤（楽天トラベル・じゃらんの掲載文と料金表）
+- yoshida＝カスタマー 吉田（問い合わせへの返信・FAQ）
+- yamada＝経理 山田（見積書・請求書・収支の試算）
+- matsumoto＝総務・法務 松本（契約書・許認可・法令チェック）
+- inoue＝開発 井上（HP・システムの改修案）
+ルール：仕事の依頼なら case を作る（質問や雑談なら null）。tasks は最大5つ、1人1つまで。企画が必要なら企画を最初に、法務チェックが必要なら最後に置く。リスク確認のタスクはシステムが自動で足すので入れない。`;
   const { text: out, cost } = await claude('sato', { prompt, maxTokens: 1500 });
   const j = parseJson(out) || { reply: out, case: null };
   let created = null;
   if (j.case && Array.isArray(j.case.tasks) && j.case.tasks.length) {
     const id = newId();
     const tasks = j.case.tasks
-      .filter((t) => OUTPUT_SPEC[t.agent] && t.agent !== 'yamamoto')
+      .filter((t, i, arr) => OUTPUT_SPEC[t.agent] && t.agent !== 'yamamoto' && arr.findIndex((x) => x.agent === t.agent) === i)
       .slice(0, 3)
       .map((t) => ({
         id: newId(),
@@ -192,7 +203,7 @@ async function runTask(r, caseId, taskId) {
   } else if (t.agent === 'yamamoto') {
     prompt = `${base}\n\n次の成果物すべてについて、法令・費用・競合・実現性の観点で反対意見と修正案を出してください。Markdownで、成果物ごとに「重大」「注意」「軽微」の3段階を付けて箇条書きにし、最後に「小西さんが判断すべきこと」を最大3つまとめる。\n\n${prevText || '（成果物がまだありません。案件の進め方そのものに反論してください）'}`;
   } else {
-    prompt = `${base}\n\nMarkdownで、そのまま社内で読める${spec.label}を作ってください。見出し・箇条書き・表を使い、数字や事実には根拠のURLを付けること。${prevText ? `\n\n参考：これまでの成果物\n${prevText}` : ''}`;
+    prompt = `${base}\n\nMarkdownで、そのまま社内で読める${spec.label}を作ってください（中身：${spec.hint}）。見出し・箇条書き・表を使い、数字や事実には根拠のURLを付けること。${prevText ? `\n\n参考：これまでの成果物\n${prevText}` : ''}`;
   }
   try {
     const { text, cost } = await claude(t.agent, { prompt, maxTokens: spec.kind === 'html' ? 4000 : 3000, caseId });
