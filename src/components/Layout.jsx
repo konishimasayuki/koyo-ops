@@ -26,6 +26,13 @@ export function KoyoLogo({ className = '', top = 'currentColor' }) {
 }
 
 const ICONS = {
+  ai: (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="8" width="14" height="11" rx="4" />
+      <path d="M12 8V5M9.5 13h.01M14.5 13h.01M9.5 16h5M3 12v3M21 12v3" />
+      <circle cx="12" cy="4" r="1.2" />
+    </svg>
+  ),
   tasks: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M9 6h11M9 12h11M9 18h11" />

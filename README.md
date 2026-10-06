@@ -16,6 +16,8 @@ api/tasks.js       業務タスクの一覧・登録・編集・完了・削除
 api/vehicles.js    車両の一覧・登録・編集・削除
 api/companies.js   会社情報（3社）
 api/events.js      カレンダーの予定
+api/ai.js          AI社員（秘書チャット・案件・タスク実行・承認・費用）
+api/_agents.js     AI社員の役割文・使うモデル・費用の上限
 api/docs.js        各種資料（写真・PDF）の登録・分割保存・取得・削除
 src/App.jsx        ログイン判定と画面切替
 src/api.js         APIの呼び出し
@@ -28,6 +30,8 @@ src/sites.js               HP閲覧に出すサイトの一覧
 src/pages/Docs.jsx         各種資料（プレビュー付き）
 src/pages/Companies.jsx    会社情報（3社の会社名・住所・代表者・法人番号など）
 src/pages/Calendar.jsx     カレンダー（月・週・予定リスト）
+src/pages/AiStaff.jsx      AI社員（オフィス・秘書チャット・案件ボード・承認箱・成果物）
+src/ai/                    AI社員のオフィス表示・見た目・Markdown表示
 src/holidays.js            日本の祝日
 public/hp/{slug}/index.html  各HPのHTML（準備中のページには <meta name="koyo-hp" content="draft">）
 public/manifest.webmanifest・public/sw.js・public/icons  PWA（ホーム画面に追加して使える）
@@ -65,3 +69,14 @@ src/styles.css     スタイル
 | `koyo:docchunk:{id}:{n}` | ファイル本体（base64を約700KBずつ分割） |
 
 一覧はMGETでまとめて取得します。ブラウザのlocalStorageは使っていません。
+
+## AI社員を動かすための設定
+
+Vercelの「Settings → Environment Variables」に次を追加して、Redeployする。
+
+| 変数 | 中身 |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | ClaudeのAPIキー（console.anthropic.com で発行） |
+
+AI社員のデータはすべて `ai:` で始まるキーに保存する（koyo-opsの既存データとは混ざらない）。
+費用の上限は1案件500円・1日2,000円（`api/_agents.js` の `LIMITS`）。
