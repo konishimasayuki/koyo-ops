@@ -473,21 +473,31 @@ function Inbox({ onAuthError, onChanged, onView }) {
     load();
   }, [load]);
 
+  const [err, setErr] = useState('');
   const decide = async (it, decision) => {
     setBusy(it.id);
+    setErr('');
     try {
       await api.aiDecide(it.id, decision, note[it.id] || '');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
       await load();
       onChanged();
-    } finally {
       setBusy('');
     }
   };
 
   const open = items.filter((i) => i.status === 'open');
-  const closed = items.filter((i) => i.status !== 'open').slice(0, 20);
+  const closed = items.filter((i) => i.status === 'approved' || i.status === 'returned').slice(0, 20);
+  const waitingOf = (caseId) => open.filter((i) => i.caseId === caseId && i.type === 'approval').length;
   return (
     <div className="inbox">
+      {err && (
+        <p className="form-error" role="alert">
+          {err}
+        </p>
+      )}
       {open.length === 0 && <div className="empty">承認待ちはありません。</div>}
       {open.map((it) => (
         <article key={it.id} className={`inbox-item t-${it.type}`}>
@@ -497,6 +507,7 @@ function Inbox({ onAuthError, onChanged, onView }) {
           </div>
           <h3>{it.title}</h3>
           <p className="muted small">{it.detail}</p>
+          {it.review && <ReviewNote review={it.review} />}
           {it.type === 'approval' && (
             <textarea rows={2} placeholder="差し戻す場合は、直してほしい点を書く" value={note[it.id] || ''} onChange={(e) => setNote((n) => ({ ...n, [it.id]: e.target.value }))} />
           )}
@@ -511,9 +522,13 @@ function Inbox({ onAuthError, onChanged, onView }) {
                 差し戻す
               </button>
             )}
-            <button type="button" className="btn gold sm" disabled={busy === it.id} onClick={() => decide(it, 'approve')}>
-              {it.type === 'report' ? '確認した（案件を完了）' : '承認する'}
-            </button>
+            {it.type === 'report' && waitingOf(it.caseId) > 0 ? (
+              <span className="muted small">承認待ちが{waitingOf(it.caseId)}件あるため、まだ完了できません</span>
+            ) : (
+              <button type="button" className="btn gold sm" disabled={busy === it.id} onClick={() => decide(it, 'approve')}>
+                {it.type === 'report' ? '確認した（案件を完了）' : '承認する'}
+              </button>
+            )}
           </div>
         </article>
       ))}
@@ -599,6 +614,7 @@ function OutputModal({ id, onClose }) {
             ×
           </button>
         </div>
+        {o?.review && <ReviewNote review={o.review} />}
         {o &&
           (o.kind === 'html' ? (
             <iframe title={o.title} className="out-frame" sandbox="" srcDoc={o.content} />
@@ -617,6 +633,27 @@ function OutputModal({ id, onClose }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ReviewNote({ review }) {
+  return (
+    <div className={`review ${review.ok ? 'ok' : 'warn'}`}>
+      <b>
+        <span className="bubble-ic sm" style={{ background: look('sato').color }}>
+          秘
+        </span>
+        秘書 佐藤のチェック：{review.ok ? 'OK' : '指摘が残っています'}
+      </b>
+      {review.summary && <p>{review.summary}</p>}
+      {!review.ok && review.comments?.length > 0 && (
+        <ul>
+          {review.comments.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

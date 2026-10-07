@@ -177,6 +177,65 @@ async function secretary(r, me, text) {
   return { reply: String(j.reply || '承知しました。').slice(0, 1500), caseId: created?.id || '', cost };
 }
 
+// 秘書 佐藤が、部署AIの成果物を指示どおりかチェックする
+async function secretaryReview(c, t, spec, content) {
+  const body =
+    spec.kind === 'html'
+      ? content
+          .replace(/<style[\s\S]*?<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .slice(0, 5000)
+      : content.slice(0, 7000);
+  const prompt = `部署AIが作った成果物を、小西さんに出す前にチェックしてください。
+
+案件：${c.title}
+ゴール：${c.goal}
+小西さんの指示：${c.instruction}
+タスク：${t.title}（${t.brief}）
+成果物の種類：${spec.label}${spec.kind === 'html' ? '（チラシ。下は画面に出る文字だけを抜き出したもの）' : ''}
+
+---- 成果物 ----
+${body}
+---- ここまで ----
+
+確認すること：指示とゴールに合っているか／会社名・車種・料金・住所などの事実に矛盾や作り話がないか／誤字や不自然な日本語／${spec.kind === 'html' ? '連絡先・料金・申し込み方法など、チラシに必要な情報が揃っているか' : '根拠のない数字がないか'}。
+次のJSONだけを返す：{"ok": true か false, "summary": "全体の評価を1〜2文", "comments": ["直すべき点（なければ空）"]}
+ok は、小西さんにそのまま見せられるなら true、直すべき点が1つでもあれば false。`;
+  const { text } = await claude('sato', { prompt, maxTokens: 800, caseId: c.id });
+  const j = parseJson(text) || { ok: true, summary: text.slice(0, 200), comments: [] };
+  return { ok: !!j.ok, summary: String(j.summary || '').slice(0, 400), comments: (Array.isArray(j.comments) ? j.comments : []).map((x) => String(x).slice(0, 300)).slice(0, 8) };
+}
+
+// 全タスクが終わり、承認待ちも残っていないときだけ完了報告を出す
+async function maybeReport(r, c) {
+  if (!c.tasks.every((x) => x.status === 'done')) return false;
+  const inbox = await getList(r, k('inbox'));
+  const mine = inbox.filter((i) => i.caseId === c.id && i.status === 'open');
+  if (mine.some((i) => i.type === 'report')) return false;
+  if (mine.some((i) => i.type === 'approval')) {
+    c.status = 'review';
+    return false;
+  }
+  c.status = 'review';
+  await pushLimited(
+    r,
+    k('inbox'),
+    {
+      id: newId(),
+      type: 'report',
+      caseId: c.id,
+      title: `完了報告：${c.title}`,
+      detail: '全タスクが終わり、外に出すものもすべて承認済みです。成果物とリスク確認を見て、案件を完了してください。',
+      status: 'open',
+      at: now(),
+    },
+    200,
+  );
+  await log(r, `案件「${c.title}」の完了報告を出しました`, 'sato');
+  return true;
+}
+
 // 部署AI：タスクを1つ実行して成果物を作る
 async function runTask(r, caseId, taskId) {
   const c = await r.get(k('case', caseId));
@@ -217,6 +276,23 @@ async function runTask(r, caseId, taskId) {
       const b = text.toLowerCase().lastIndexOf('</html>');
       content = a >= 0 && b > a ? text.slice(a, b + 7) : text;
     }
+    // 秘書のチェック（リスク担当の山本以外）。直すべき点があれば1回だけ自動で作り直させる
+    let review = null;
+    if (t.agent !== 'yamamoto') {
+      await setAgent(r, 'sato', 'working', `「${t.title}」をチェック中…`, caseId);
+      review = await secretaryReview(c, t, spec, content);
+      await setAgent(r, 'sato', 'idle', `案件「${c.title}」を管理中`, caseId);
+      if (!review.ok && !t.reworked) {
+        t.reworked = true;
+        t.status = 'todo';
+        t.feedback = `秘書 佐藤からの指摘：\n${review.comments.map((x) => `・${x}`).join('\n') || review.summary}`;
+        await saveCase(r, c);
+        await setAgent(r, t.agent, 'assigned', `佐藤の指摘で「${t.title}」を作り直し`, caseId);
+        await log(r, `秘書 佐藤が「${spec.label}」を${agent.name}に差し戻しました：${review.summary}`, 'sato');
+        return { reworked: true, case: c };
+      }
+      await log(r, `秘書 佐藤が「${spec.label}」をチェックしました：${review.ok ? 'OK' : '指摘が残っています'}`, 'sato');
+    }
     const o = {
       id: t.outputId || newId(),
       caseId,
@@ -226,6 +302,7 @@ async function runTask(r, caseId, taskId) {
       title: `${spec.label}：${c.title}`,
       content,
       status: spec.approval ? 'pending' : 'done',
+      review,
       cost,
       createdAt: now(),
     };
@@ -245,24 +322,15 @@ async function runTask(r, caseId, taskId) {
           taskId: t.id,
           outputId: o.id,
           title: `${spec.label}の承認`,
-          detail: `${agent.dept} ${agent.name}が作成。外に出す前に確認してください。`,
+          detail: `${agent.dept} ${agent.name}が作成し、秘書 佐藤がチェックしました。外に出す前に確認してください。`,
+          review,
           status: 'open',
           at: now(),
         },
         200,
       );
     }
-    const allDone = c.tasks.every((x) => x.status === 'done');
-    if (allDone) {
-      c.status = 'review';
-      await pushLimited(
-        r,
-        k('inbox'),
-        { id: newId(), type: 'report', caseId, title: `完了報告：${c.title}`, detail: '全タスクが終わりました。成果物とリスク確認を見てください。', status: 'open', at: now() },
-        200,
-      );
-      await log(r, `案件「${c.title}」の全タスクが終わりました`, 'sato');
-    }
+    await maybeReport(r, c);
     await saveCase(r, c);
     await setAgent(r, t.agent, 'idle', `「${t.title}」を提出しました`, caseId);
     await log(r, `${agent.dept} ${agent.name}が「${spec.label}」を提出しました（${cost}円）`, t.agent);
@@ -438,6 +506,11 @@ const main = withAuth(async (req, res, me) => {
       const inbox = await getList(r, k('inbox'));
       const item = inbox.find((i) => i.id === b.id);
       if (!item) return send(res, 404, { error: '見つかりません' });
+      if (item.status !== 'open') return send(res, 409, { error: 'すでに処理済みです' });
+      if (item.type === 'report') {
+        const waiting = inbox.filter((i) => i.caseId === item.caseId && i.type === 'approval' && i.status === 'open').length;
+        if (waiting) return send(res, 409, { error: `この案件には承認待ちが${waiting}件残っています。先に承認か差し戻しをしてください` });
+      }
       item.status = b.decision === 'return' ? 'returned' : 'approved';
       item.decidedAt = now();
       item.note = String(b.note || '').slice(0, 1000);
@@ -455,11 +528,18 @@ const main = withAuth(async (req, res, me) => {
         if (t) {
           t.status = 'todo';
           t.feedback = item.note || 'もう一度見直してください';
+          t.reworked = false;
           c.status = 'active';
+          for (const i of inbox) if (i.caseId === c.id && i.type === 'report' && i.status === 'open') i.status = 'withdrawn';
+          await r.set(k('inbox'), inbox);
           await saveCase(r, c);
           await setAgent(r, t.agent, 'assigned', `差し戻し：「${t.title}」をやり直し`, c.id);
           if (!(await paused(r, c.id))) waitUntil(trigger(r, originOf(req), c.id));
         }
+      }
+      if (item.type === 'approval' && item.status === 'approved') {
+        const c = await r.get(k('case', item.caseId));
+        if (c && (await maybeReport(r, c))) await saveCase(r, c);
       }
       if (item.type === 'report' && item.status === 'approved') {
         const c = await r.get(k('case', item.caseId));
