@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import { waitUntil } from '@vercel/functions';
 import { AGENTS, FUTURE, LIMITS, MODELS, OUTPUT_SPEC, USD_JPY, WEB_SEARCH_USD } from './_agents.js';
 import { body, newId, now, redis, send, withAuth } from './_lib.js';
 
@@ -85,8 +87,8 @@ function parseJson(text) {
 async function listCases(r) {
   const ids = (await r.get(k('cases'))) || [];
   if (!ids.length) return [];
-  const vals = await r.mget(...ids.map((id) => k('case', id)));
-  return vals.filter(Boolean);
+  const [vals, pauses] = await Promise.all([r.mget(...ids.map((id) => k('case', id))), r.mget(...ids.map((id) => k('pause', id)))]);
+  return vals.map((c, i) => (c ? { ...c, auto: !pauses[i] } : null)).filter(Boolean);
 }
 async function saveCase(r, c) {
   c.updatedAt = now();
@@ -162,6 +164,7 @@ async function secretary(r, me, text) {
       company: ['浩洋国際', 'HayateX', 'GTO', '3社共同'].includes(j.case.company) ? j.case.company : '3社共同',
       instruction: text,
       status: 'active',
+      auto: true,
       tasks,
       createdAt: now(),
       createdBy: me.id,
@@ -185,6 +188,7 @@ async function runTask(r, caseId, taskId) {
   const spec = OUTPUT_SPEC[t.agent];
   const agent = AGENTS[t.agent];
   t.status = 'doing';
+  t.startedAt = now();
   await saveCase(r, c);
   await setAgent(r, t.agent, 'working', `「${t.title}」を作成中…`, caseId);
   await log(r, `${agent.dept} ${agent.name}が「${t.title}」に取りかかりました`, t.agent);
@@ -273,7 +277,86 @@ async function runTask(r, caseId, taskId) {
   }
 }
 
-export default withAuth(async (req, res, me) => {
+// ---------- 自動で進める仕組み ----------
+// 1タスクずつ別の関数呼び出しで実行し、終わったら次を呼ぶ（Vercelの実行時間の上限対策）
+const STALE_MS = 6 * 60 * 1000;
+
+async function secret(r) {
+  let s = await r.get(k('secret'));
+  if (!s) {
+    s = randomBytes(24).toString('hex');
+    await r.set(k('secret'), s);
+  }
+  return String(s);
+}
+
+function originOf(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (String(host).startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}`;
+}
+
+async function trigger(r, origin, caseId) {
+  try {
+    await fetch(`${origin}/api/ai?action=step`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ai-secret': await secret(r) },
+      body: JSON.stringify({ caseId }),
+    });
+  } catch {
+    // 呼び出しに失敗しても、案件ボードを開けば再開する
+  }
+}
+
+// 止まったままの「作業中」を未着手に戻す
+function resetStale(c) {
+  let changed = false;
+  for (const t of c.tasks) {
+    if (t.status === 'doing' && Date.now() - new Date(t.startedAt || c.updatedAt).getTime() > STALE_MS) {
+      t.status = 'todo';
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+const nextTask = (c) => c.tasks.find((t) => t.status === 'todo');
+const canAuto = (c) => c && c.auto !== false && c.status === 'active' && !c.tasks.some((t) => t.status === 'error');
+// 一時停止は案件とは別のキーで持つ（実行中のタスクが案件を上書きしても消えないように）
+const paused = async (r, caseId) => !!(await r.get(k('pause', caseId)));
+
+async function processStep(r, origin, caseId) {
+  const got = await r.set(k('lock', caseId), '1', { nx: true, ex: 330 });
+  if (!got) return;
+  let more = false;
+  try {
+    const c = await r.get(k('case', caseId));
+    if (!canAuto(c) || (await paused(r, caseId))) return;
+    if (resetStale(c)) await saveCase(r, c);
+    if (c.tasks.some((t) => t.status === 'doing')) return;
+    const t = nextTask(c);
+    if (!t) return;
+    await runTask(r, caseId, t.id);
+    const after = await r.get(k('case', caseId));
+    more = canAuto(after) && !!nextTask(after) && !(await paused(r, caseId));
+  } catch {
+    more = false;
+  } finally {
+    await r.del(k('lock', caseId));
+  }
+  if (more) await trigger(r, origin, caseId);
+}
+
+async function stepHandler(req, res) {
+  const r = redis();
+  if (req.headers['x-ai-secret'] !== (await secret(r))) return send(res, 403, { error: 'forbidden' });
+  const { caseId } = body(req);
+  if (!caseId) return send(res, 400, { error: 'caseId がありません' });
+  waitUntil(processStep(r, originOf(req), caseId));
+  return send(res, 202, { ok: true });
+}
+
+const main = withAuth(async (req, res, me) => {
   const r = redis();
   const q = req.query || {};
 
@@ -316,6 +399,7 @@ export default withAuth(async (req, res, me) => {
       await pushLimited(r, k('chat'), { id: newId(), from: 'user', text, at: now() }, 120);
       try {
         const out = await secretary(r, me, text);
+        if (out.caseId) waitUntil(trigger(r, originOf(req), out.caseId));
         await pushLimited(r, k('chat'), { id: newId(), from: 'sato', text: out.reply, caseId: out.caseId, at: now() }, 120);
         return send(res, 200, out);
       } catch (e) {
@@ -323,6 +407,25 @@ export default withAuth(async (req, res, me) => {
         await pushLimited(r, k('chat'), { id: newId(), from: 'system', text: e.message, at: now() }, 120);
         return send(res, 500, { error: e.message });
       }
+    }
+    if (q.action === 'kick') {
+      const c = await r.get(k('case', b.caseId));
+      if (!c) return send(res, 404, { error: '案件が見つかりません' });
+      if (resetStale(c)) await saveCase(r, c);
+      if (canAuto(c) && nextTask(c) && !(await paused(r, c.id))) waitUntil(trigger(r, originOf(req), c.id));
+      return send(res, 200, { ok: true });
+    }
+    if (q.action === 'auto') {
+      const c = await r.get(k('case', b.caseId));
+      if (!c) return send(res, 404, { error: '案件が見つかりません' });
+      c.auto = !!b.on;
+      if (b.on) await r.del(k('pause', c.id));
+      else await r.set(k('pause', c.id), '1');
+      if (b.on) for (const t of c.tasks) if (t.status === 'error') t.status = 'todo';
+      await saveCase(r, c);
+      await log(r, `案件「${c.title}」の自動進行を${b.on ? '再開' : '一時停止'}しました`, 'sato');
+      if (b.on) waitUntil(trigger(r, originOf(req), c.id));
+      return send(res, 200, { case: c });
     }
     if (q.action === 'run') {
       try {
@@ -355,6 +458,7 @@ export default withAuth(async (req, res, me) => {
           c.status = 'active';
           await saveCase(r, c);
           await setAgent(r, t.agent, 'assigned', `差し戻し：「${t.title}」をやり直し`, c.id);
+          if (!(await paused(r, c.id))) waitUntil(trigger(r, originOf(req), c.id));
         }
       }
       if (item.type === 'report' && item.status === 'approved') {
@@ -383,6 +487,7 @@ export default withAuth(async (req, res, me) => {
       ids.filter((id) => !outs.some((o) => o.id === id)),
     );
     await r.del(k('case', q.caseId));
+    await r.del(k('pause', q.caseId));
     await r.set(
       k('cases'),
       ((await r.get(k('cases'))) || []).filter((id) => id !== q.caseId),
@@ -397,3 +502,8 @@ export default withAuth(async (req, res, me) => {
 
   return send(res, 405, { error: 'Method Not Allowed' });
 });
+
+export default async function handler(req, res) {
+  if (req.method === 'POST' && req.query?.action === 'step') return stepHandler(req, res);
+  return main(req, res);
+}

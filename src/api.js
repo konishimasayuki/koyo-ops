@@ -37,6 +37,8 @@ export const api = {
   aiSend: (text) => request('/api/ai?action=chat', { method: 'POST', data: { text } }),
   aiClearChat: () => request('/api/ai?action=clear-chat', { method: 'POST', data: {} }),
   aiCases: () => request('/api/ai?view=cases'),
+  aiKick: (caseId) => request('/api/ai?action=kick', { method: 'POST', data: { caseId } }),
+  aiAuto: (caseId, on) => request('/api/ai?action=auto', { method: 'POST', data: { caseId, on } }),
   aiRun: (caseId, taskId) => request('/api/ai?action=run', { method: 'POST', data: { caseId, taskId } }),
   aiDeleteCase: (id) => request(`/api/ai?caseId=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   aiInbox: () => request('/api/ai?view=inbox'),

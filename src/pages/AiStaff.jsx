@@ -289,47 +289,73 @@ function Chat({ onAuthError, onChanged, onGo }) {
 }
 
 // ---------- 案件ボード ----------
+// 案件は自動で1タスクずつ進む。画面は数秒ごとに最新の状態を読み直す
+const isRunning = (c) =>
+  c.auto !== false && c.status === 'active' && c.tasks.some((t) => t.status === 'todo' || t.status === 'doing') && !c.tasks.some((t) => t.status === 'error');
+
 function Board({ me, onAuthError, onChanged, onView }) {
   const [cases, setCases] = useState([]);
-  const [running, setRunning] = useState('');
+  const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const kicked = useRef(false);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
     try {
-      setCases((await api.aiCases()).cases);
+      const list = (await api.aiCases()).cases;
+      setCases(list);
+      return list;
     } catch (e) {
       onAuthError(e);
+      return [];
     }
   }, [onAuthError]);
+
+  // 開いたときに、止まっている案件があれば自動進行を呼び直す
   useEffect(() => {
-    load();
+    load().then((list) => {
+      if (kicked.current) return;
+      kicked.current = true;
+      for (const c of list) if (isRunning(c)) api.aiKick(c.id).catch(() => {});
+    });
   }, [load]);
 
-  const run = async (c, t) => {
-    setRunning(t.id);
+  const anyRunning = cases.some(isRunning);
+  useEffect(() => {
+    if (!anyRunning) return;
+    const t = window.setInterval(() => {
+      load();
+      onChanged();
+    }, 4000);
+    return () => window.clearInterval(t);
+  }, [anyRunning, load, onChanged]);
+
+  const setAuto = async (c, on) => {
+    setBusy(c.id);
     setErr('');
-    setCases((l) => l.map((x) => (x.id === c.id ? { ...x, tasks: x.tasks.map((y) => (y.id === t.id ? { ...y, status: 'doing' } : y)) } : x)));
-    onChanged();
     try {
-      await api.aiRun(c.id, t.id);
-      return true;
-    } catch (e) {
-      onAuthError(e);
-      setErr(e.message);
-      return false;
-    } finally {
-      setRunning('');
+      await api.aiAuto(c.id, on);
       await load();
       onChanged();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy('');
     }
   };
 
-  const runAll = async (c) => {
-    for (const t of c.tasks) {
-      if (t.status === 'done') continue;
-      const ok = await run(c, t);
-      if (!ok) break;
+  const runOne = async (c, t) => {
+    setBusy(t.id);
+    setErr('');
+    try {
+      await api.aiRun(c.id, t.id);
+    } catch (e) {
+      onAuthError(e);
+      setErr(e.message);
+    } finally {
+      setBusy('');
+      await load();
+      onChanged();
     }
   };
 
@@ -340,7 +366,7 @@ function Board({ me, onAuthError, onChanged, onView }) {
     onChanged();
   };
 
-  if (!cases.length) return <div className="empty">案件はまだありません。秘書チャットから佐藤に指示を出すと、ここに案件ができます。</div>;
+  if (!cases.length) return <div className="empty">案件はまだありません。秘書チャットから佐藤に指示を出すと、ここに案件ができて自動で進みます。</div>;
   return (
     <div className="cases">
       {err && (
@@ -349,25 +375,42 @@ function Board({ me, onAuthError, onChanged, onView }) {
         </p>
       )}
       {cases.map((c) => {
-        const left = c.tasks.filter((t) => t.status !== 'done').length;
+        const running = isRunning(c);
+        const paused = c.auto === false && c.status === 'active' && c.tasks.some((t) => t.status !== 'done');
+        const failed = c.tasks.some((t) => t.status === 'error');
+        const done = c.tasks.filter((t) => t.status === 'done').length;
         return (
           <article key={c.id} className="case">
             <div className="case-head">
               <div>
                 <span className={`case-st cs-${c.status}`}>{CASE_LABEL[c.status] || c.status}</span>
+                {running && <span className="auto-st">自動で進行中</span>}
+                {paused && <span className="auto-st paused">一時停止中</span>}
+                {failed && <span className="auto-st failed">エラーで停止</span>}
                 <h3>{c.title}</h3>
                 <p className="muted small">
                   {c.company}・{fmtTime(c.createdAt)}・{c.goal}
                 </p>
+                <div className="case-prog">
+                  <span className="cl-bar">
+                    <i style={{ width: `${(done / c.tasks.length) * 100}%` }} />
+                  </span>
+                  {done}/{c.tasks.length} 完了
+                </div>
               </div>
               <div className="case-actions">
-                {left > 0 && (
-                  <button type="button" className="btn gold sm" disabled={!!running} onClick={() => runAll(c)}>
-                    {running ? '作業中…' : `残り${left}件をまとめて進める`}
+                {running && (
+                  <button type="button" className="btn ghost sm" disabled={busy === c.id} onClick={() => setAuto(c, false)}>
+                    一時停止
+                  </button>
+                )}
+                {(paused || failed) && (
+                  <button type="button" className="btn gold sm" disabled={busy === c.id} onClick={() => setAuto(c, true)}>
+                    {failed ? 'やり直して再開' : '再開する'}
                   </button>
                 )}
                 {me.role === 'admin' && (
-                  <button type="button" className="btn danger-ghost sm" onClick={() => remove(c)} disabled={!!running}>
+                  <button type="button" className="btn danger-ghost sm" onClick={() => remove(c)}>
                     削除
                   </button>
                 )}
@@ -378,13 +421,14 @@ function Board({ me, onAuthError, onChanged, onView }) {
                 const a = look(t.agent);
                 return (
                   <li key={t.id} className={`ctask ts-${t.status}`}>
-                    <span className="bubble-ic" style={{ background: a.color }}>
+                    <span className={`bubble-ic${t.status === 'doing' ? ' working' : ''}`} style={{ background: a.color }}>
                       {a.icon}
                     </span>
                     <div className="ctask-main">
                       <b>{t.title}</b>
                       <small>
-                        {a.dept} {a.name}・<span className={`tst tst-${t.status}`}>{running === t.id ? '作業中…' : TASK_LABEL[t.status]}</span>
+                        {a.dept} {a.name}・
+                        <span className={`tst tst-${t.status}`}>{t.status === 'doing' ? '作業中…' : t.status === 'todo' && running ? '順番待ち' : TASK_LABEL[t.status]}</span>
                         {t.feedback ? '・差し戻しあり' : ''}
                       </small>
                       {t.status === 'error' && <small className="err-line">{t.error}</small>}
@@ -395,9 +439,9 @@ function Board({ me, onAuthError, onChanged, onView }) {
                           見る
                         </button>
                       )}
-                      {t.status !== 'done' && (
-                        <button type="button" className="btn ghost sm" disabled={!!running} onClick={() => run(c, t)}>
-                          {running === t.id ? '作業中…' : t.status === 'error' ? 'やり直す' : '実行'}
+                      {paused && t.status === 'todo' && (
+                        <button type="button" className="btn ghost sm" disabled={!!busy} onClick={() => runOne(c, t)}>
+                          {busy === t.id ? '作業中…' : 'これだけ実行'}
                         </button>
                       )}
                     </div>
